@@ -22,7 +22,10 @@ require_ok( "BioX::Seq::Fast5" );
 # H5Fopen
 
 ok( my $file = BioX::Seq::Fast5->new(FN), "open FAST5 file" );
-say Dumper $file;
+say $file->exp_start_time;
+say $file->read_start_time;
+say $file->read_duration;
+#say Dumper $file;
 
 done_testing();
 

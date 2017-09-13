@@ -6,6 +6,7 @@ use 5.012;
 
 use Carp;
 use Data::Dumper;
+use Time::Piece;
 require Exporter;
 
 our $VERSION = '0.001';
@@ -162,6 +163,7 @@ sub new {
     $self->{fid} = $fid;
 
     $self->_parse_meta;
+    $self->_parse_raw;
 
     return $self;
 
@@ -179,6 +181,74 @@ sub DESTROY {
 
 }
 
+sub _parse_raw {
+
+    my ($self) = @_;
+
+    my $gp = H5Gopen(
+        $self->{fid},
+        '/Raw/Reads',
+        &H5P_DEFAULT
+    );
+    die "UniqueGlobalKey not found. Is this a valid FAST5 file?\n"
+        if ($gp < 0);
+    my $info = H5Gget_info($gp)
+        or die "failed to get info for meta group\n";
+    my $n = $info->{nlinks} // die "No attribute count specified\n";
+    die "Exactly one read expected but no or multiple reads found\n"
+        if ($n != 1);
+
+    my $read_name = H5Lget_name_by_idx(
+        $gp,
+        '.',
+        &H5_INDEX_NAME,
+        &H5_ITER_INC,
+        0,
+        &H5P_DEFAULT
+    );
+
+    die "Failed to get read name\n"
+        if ($read_name lt 0);
+
+    my $sub_gp = H5Gopen(
+        $gp,
+        $read_name,
+        &H5P_DEFAULT
+    );
+    die "subgroup $read_name not found\n"
+        if ($sub_gp < 0);
+    $info = H5Oget_info($sub_gp)
+        or die "failed to get info for meta group\n";
+    my $n_attrs = $info->{num_attrs} // die "No attribute count specified\n";
+
+    for my $j (0..$n_attrs-1) {
+
+        my $id = H5Aopen_by_idx(
+            $sub_gp,
+            '.',
+            &H5_INDEX_NAME,
+            &H5_ITER_INC,
+            $j,
+            &H5P_DEFAULT,
+            &H5P_DEFAULT
+        );
+        my $name = H5Aget_name($id);
+        die "Failed to get attr name\n"
+            if ($name lt 0);
+        $self->{raw}->{$name} = H5Aread($id)->[0]
+            if ($id >= 0);
+    }
+
+    my $ds_id = H5Dopen(
+        $sub_gp,
+        'Signal',
+        &H5P_DEFAULT,
+    );
+    die "Failed to find raw signal\n"
+        if ($ds_id < 0);
+    $self->{raw}->{signal} = H5Dread($ds_id)->[0];
+
+}
 
 sub _parse_meta {
 
@@ -209,7 +279,7 @@ sub _parse_meta {
         );
 
         die "Failed to get group name\n"
-            if ($gp_name < 0);
+            if ($gp_name lt 0);
 
         my $sub_gp = H5Gopen(
             $gp,
@@ -235,12 +305,72 @@ sub _parse_meta {
             );
             my $name = H5Aget_name($id);
             die "Failed to get attr name\n"
-                if ($name < 0);
-            $self->{$gp_name}->{$name} = H5Aread($id)
+                if ($name lt 0);
+            $self->{meta}->{$gp_name}->{$name} = H5Aread($id)->[0]
                 if ($id >= 0);
         }
 
     }
+
+}
+
+sub exp_start_time {
+
+    my ($self) = @_;
+
+    return $self->{cache}->{exp_start_time}
+        if (defined $self->{cache}->{exp_start_time});
+
+    my $t_str = $self->{meta}->{tracking_id}->{exp_start_time}
+        // return undef;
+
+    if ($t_str =~ /\D/) { # string timestamp
+        my $t = Time::Piece->strptime($t_str, "%Y-%m-%dT%TZ")
+            or die "Error parsing timestamp: $@\n";
+        $t_str = $t->epoch;
+    }
+    
+    $self->{cache}->{exp_start_time} = $t_str;
+    return $t_str;
+        
+} 
+
+sub read_start_time {
+
+    my ($self) = @_;
+
+    return $self->{cache}->{read_start_time}
+        if (defined $self->{cache}->{read_start_time});
+
+    my $t = $self->{raw}->{start_time}
+        // return undef;
+
+    my $f = $self->{meta}->{context_tags}->{sample_frequency}
+        // return undef;
+
+    my $s = $self->exp_start_time() + $t/$f;
+    
+    $self->{cache}->{read_start_time} = $s;
+    return $s;
+        
+} 
+
+sub read_duration {
+
+    my ($self) = @_;
+
+    return $self->{cache}->{read_duration}
+        if (defined $self->{cache}->{read_duration});
+
+    my $d = $self->{raw}->{duration}
+        // return undef;
+    my $f = $self->{meta}->{context_tags}->{sample_frequency}
+        // return undef;
+   
+    $d = $d/$f;
+    $self->{cache}->{read_duration} = $d;
+
+    return $d;
 
 }
 

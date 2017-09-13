@@ -313,8 +313,147 @@ int h5awrite_int8_p(attr_id, mem_type_id, buffer)
         OUTPUT:
                 RETVAL
 
+AV *
+H5Aread_uint32(attr_id)
+    hid_t attr_id;
 
-AV * 
+    PREINIT:
+
+        AV *data;
+        int npoints;
+        int i;
+        hid_t attr_space_id;
+        SV *elem;
+
+    INIT:
+        hid_t type;
+        hid_t native;
+        H5T_class_t class;
+        
+    CODE:
+        type = H5Aget_type(attr_id);
+        class = H5Tget_class(type);
+        native = H5Tget_native_type(type, H5T_DIR_ASCEND);
+
+        data = (AV *)sv_2mortal((SV *)newAV());
+        attr_space_id = H5Aget_space(attr_id);
+        npoints = H5Sget_select_npoints(attr_space_id);
+
+        uint32_t *read_data;
+        read_data = (uint32_t *) malloc(sizeof(uint32_t) * npoints);
+        H5Aread(attr_id, native, read_data);
+        for (i = 0; i < npoints; i++) {
+            elem = newSVuv(read_data[i]);
+            av_store(data, i, elem);
+            //SvREFCNT_dec(elem);
+        }
+
+        free(read_data);
+        H5Sclose(attr_space_id);
+        H5Tclose(type);
+        H5Tclose(native);
+        RETVAL = data;
+        //RETVAL = data;
+    OUTPUT:
+        RETVAL
+
+AV *
+H5Aread_float(attr_id)
+    hid_t attr_id;
+
+    PREINIT:
+
+        AV *data;
+        int npoints;
+        int i;
+        hid_t attr_space_id;
+        SV *elem;
+
+    INIT:
+        if (attr_id < 0)
+                XSRETURN_UNDEF;
+        hid_t type;
+        hid_t native;
+        H5T_class_t class;
+        
+    CODE:
+        type = H5Aget_type(attr_id);
+        class = H5Tget_class(type);
+        native = H5Tget_native_type(type, H5T_DIR_ASCEND);
+
+        data = (AV *)sv_2mortal((SV *)newAV());
+        attr_space_id = H5Aget_space(attr_id);
+        npoints = H5Sget_select_npoints(attr_space_id);
+
+        double *read_data;
+        read_data = (double *) malloc(sizeof(double) * npoints);
+        H5Aread(attr_id, native, read_data);
+        for (i = 0; i < npoints; i++) {
+            elem = newSVnv(read_data[i]);
+            av_store(data, i, elem);
+        }
+
+        free(read_data);
+        H5Sclose(attr_space_id);
+        H5Tclose(type);
+        H5Tclose(native);
+        RETVAL = data;
+    OUTPUT:
+        RETVAL
+
+AV *
+H5Aread_string(attr_id)
+    hid_t attr_id;
+
+    PREINIT:
+
+        AV *data;
+        int npoints;
+        int i;
+        hid_t attr_space_id;
+        SV *elem;
+
+    INIT:
+        if (attr_id < 0)
+                XSRETURN_UNDEF;
+        hid_t type;
+        hid_t native;
+        H5T_class_t class;
+        
+    CODE:
+        type = H5Aget_type(attr_id);
+        class = H5Tget_class(type);
+        native = H5Tget_native_type(type, H5T_DIR_ASCEND);
+
+        hsize_t size;
+        size = H5Tget_size(type);
+
+        data = (AV *)sv_2mortal((SV *)newAV());
+        attr_space_id = H5Aget_space(attr_id);
+        npoints = H5Sget_select_npoints(attr_space_id);
+
+        char *read_data;
+        read_data = (char *) malloc(size*sizeof(char)*npoints);
+        H5Aread(attr_id, native, read_data);
+        char *j;
+        j = read_data;
+        for (i = 0; i < npoints; i++) {
+            char field[size];
+            strcpy(field, j);
+            elem = newSVpv(field, 0);
+            av_store(data, i, elem);
+            j += size;
+        }
+
+        free(read_data);
+        H5Sclose(attr_space_id);
+        H5Tclose(type);
+        H5Tclose(native);
+        RETVAL = data;
+    OUTPUT:
+        RETVAL
+
+AV *
 H5Aread(attr_id)
     hid_t attr_id;
 
@@ -332,13 +471,13 @@ H5Aread(attr_id)
         hid_t type;
         hid_t native;
         H5T_class_t class;
-        SV *ret;
+        
     CODE:
         type = H5Aget_type(attr_id);
         class = H5Tget_class(type);
         native = H5Tget_native_type(type, H5T_DIR_ASCEND);
 
-        data = newAV();
+        data = (AV *)sv_2mortal((SV *)newAV());
         attr_space_id = H5Aget_space(attr_id);
         npoints = H5Sget_select_npoints(attr_space_id);
 
@@ -470,6 +609,7 @@ H5Aread(attr_id)
             free(read_data);
 
         }
+        H5Sclose(attr_space_id);
         H5Tclose(type);
         H5Tclose(native);
         RETVAL = data;
@@ -495,13 +635,12 @@ H5Dread(dataset_id)
         hid_t type;
         hid_t native;
         H5T_class_t class;
-        SV *ret;
     CODE:
         type = H5Dget_type(dataset_id);
         class = H5Tget_class(type);
         native = H5Tget_native_type(type, H5T_DIR_ASCEND);
 
-        data = newAV();
+        data = (AV *)sv_2mortal((SV *)newAV());
         dataset_space_id = H5Dget_space(dataset_id);
         npoints = H5Sget_select_npoints(dataset_space_id);
 
@@ -638,6 +777,7 @@ H5Dread(dataset_id)
         }
         H5Tclose(type);
         H5Tclose(native);
+        H5Sclose(dataset_space_id);
         RETVAL = data;
     OUTPUT:
             RETVAL
@@ -676,13 +816,9 @@ AV * h5aread_int8_p(attr_id, mem_type_id)
 	
 # int h5aread_p(attr_id, mem_type_id, buf)
 
-int h5aclose_p(attr_id)
-	int attr_id
+int H5Aclose(attr_id)
+	hid_t attr_id
 
-	CODE:
-		RETVAL = H5Aclose(attr_id);	
-	OUTPUT:
-		RETVAL
 
 #int h5aget_name_p(attr_id, buf_size, buf)
 
@@ -828,13 +964,9 @@ int h5dopen_p(loc_id, name)
 	OUTPUT:
 		RETVAL
 
-int h5dclose_p(id)
-	int id
+int H5Dclose(id)
+	hid_t id
 
-	CODE:
-		RETVAL = H5Dclose(id);
-	OUTPUT:
-		RETVAL
 
 int h5dget_space_p(id)
 	int id;
@@ -1364,13 +1496,9 @@ AV * h5sget_simple_extent_dims_p(space_id)
 
 
 	
-int h5sclose_p(id)
-	int id
-
-	CODE:
-		RETVAL = H5Sclose(id);
-	OUTPUT:
-		RETVAL
+herr_t
+H5Sclose(id)
+	hid_t id
 
 		
 ###### H5T API

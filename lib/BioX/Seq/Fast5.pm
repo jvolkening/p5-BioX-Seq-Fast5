@@ -162,7 +162,8 @@ sub new {
         if ($fid < 0);
     $self->{fid} = $fid;
 
-    $self->_parse_meta;
+    #$self->_parse_test;
+    #$self->_parse_meta;
     $self->_parse_raw;
 
     return $self;
@@ -180,7 +181,148 @@ sub DESTROY {
     return 1;
 
 }
+sub _parse_test_2 {
 
+    my ($self) = @_;
+
+    my $gp = H5Gopen(
+        $self->{fid},
+        '/Raw/Reads',
+        &H5P_DEFAULT
+    );
+    die "UniqueGlobalKey not found. Is this a valid FAST5 file?\n"
+        if ($gp < 0);
+    my $info = H5Gget_info($gp)
+        or die "failed to get info for meta group\n";
+    my $n = $info->{nlinks} // die "No attribute count specified\n";
+    die "Exactly one read expected but no or multiple reads found\n"
+        if ($n != 1);
+#
+    my $read_name = H5Lget_name_by_idx(
+        $gp,
+        '.',
+        &H5_INDEX_NAME,
+        &H5_ITER_INC,
+        0,
+        &H5P_DEFAULT
+    );
+
+    die "Failed to get read name\n"
+        if ($read_name lt 0);
+
+    my $sub_gp = H5Gopen(
+        $gp,
+        $read_name,
+        &H5P_DEFAULT
+    );
+    die "subgroup $read_name not found\n"
+        if ($sub_gp < 0);
+    $info = H5Oget_info($sub_gp)
+        or die "failed to get info for meta group\n";
+    my $n_attrs = $info->{num_attrs} // die "No attribute count specified\n";
+
+    my $id = H5Aopen_by_name(
+        $sub_gp,
+        '.',
+        'duration',
+        &H5P_DEFAULT,
+        &H5P_DEFAULT
+    );
+    my $name = H5Aget_name($id);
+    die "Failed to get attr name\n"
+        if ($name lt 0);
+    $self->{raw}->{$name} = H5Aread_uint32($id)
+    #$self->{raw}->{$name} = H5Aread_uint32($id)->[0]
+        if ($id >= 0);
+
+    H5Aclose($id);
+
+    my $ds_id = H5Dopen(
+        $sub_gp,
+        'Signal',
+        &H5P_DEFAULT,
+    );
+    die "Failed to find raw signal\n"
+        if ($ds_id < 0);
+    #$self->{raw}->{signal} = H5Dread($ds_id)->[0];
+    H5Dclose($ds_id);
+    H5Gclose($sub_gp);
+    H5Gclose($gp);
+#
+}
+
+sub _parse_test {
+
+    my ($self) = @_;
+
+    my $gp = H5Gopen(
+        $self->{fid},
+        '/Raw/Reads',
+        &H5P_DEFAULT
+    );
+    die "UniqueGlobalKey not found. Is this a valid FAST5 file?\n"
+        if ($gp < 0);
+    my $info = H5Gget_info($gp)
+        or die "failed to get info for meta group\n";
+    my $n = $info->{nlinks} // die "No attribute count specified\n";
+    die "Exactly one read expected but no or multiple reads found\n"
+        if ($n != 1);
+#
+    my $read_name = H5Lget_name_by_idx(
+        $gp,
+        '.',
+        &H5_INDEX_NAME,
+        &H5_ITER_INC,
+        0,
+        &H5P_DEFAULT
+    );
+
+    die "Failed to get read name\n"
+        if ($read_name lt 0);
+
+    my $sub_gp = H5Gopen(
+        $gp,
+        $read_name,
+        &H5P_DEFAULT
+    );
+    die "subgroup $read_name not found\n"
+        if ($sub_gp < 0);
+    $info = H5Oget_info($sub_gp)
+        or die "failed to get info for meta group\n";
+    my $n_attrs = $info->{num_attrs} // die "No attribute count specified\n";
+
+    for my $j (0..$n_attrs-1) {
+
+        my $id = H5Aopen_by_idx(
+            $sub_gp,
+            '.',
+            &H5_INDEX_NAME,
+            &H5_ITER_INC,
+            $j,
+            &H5P_DEFAULT,
+            &H5P_DEFAULT
+        );
+        my $name = H5Aget_name($id);
+        die "Failed to get attr name\n"
+            if ($name lt 0);
+        #$self->{raw}->{$name} = H5Aread($id)->[0]
+            #if ($id >= 0);
+        H5Aclose($id);
+    }
+
+    my $ds_id = H5Dopen(
+        $sub_gp,
+        'Signal',
+        &H5P_DEFAULT,
+    );
+    die "Failed to find raw signal\n"
+        if ($ds_id < 0);
+    $self->{raw}->{signal} = H5Dread($ds_id)->[0];
+    H5Dclose($ds_id);
+    H5Gclose($sub_gp);
+    H5Gclose($gp);
+#
+}
 sub _parse_raw {
 
     my ($self) = @_;
@@ -237,6 +379,7 @@ sub _parse_raw {
             if ($name lt 0);
         $self->{raw}->{$name} = H5Aread($id)->[0]
             if ($id >= 0);
+        H5Aclose($id);
     }
 
     my $ds_id = H5Dopen(
@@ -247,6 +390,10 @@ sub _parse_raw {
     die "Failed to find raw signal\n"
         if ($ds_id < 0);
     $self->{raw}->{signal} = H5Dread($ds_id)->[0];
+
+    H5Dclose($ds_id);
+    H5Gclose($sub_gp);
+    H5Gclose($gp);
 
 }
 
@@ -308,9 +455,12 @@ sub _parse_meta {
                 if ($name lt 0);
             $self->{meta}->{$gp_name}->{$name} = H5Aread($id)->[0]
                 if ($id >= 0);
+            H5Aclose($id);
         }
+        H5Gclose($sub_gp);
 
     }
+    H5Gclose($gp);
 
 }
 

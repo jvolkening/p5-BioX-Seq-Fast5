@@ -45,70 +45,6 @@ sub DESTROY {
 
 }
 
-sub _parse_test {
-
-    my ($self) = @_;
-
-    my $gp = H5Gopen(
-        $self->{fid},
-        "/UniqueGlobalKey",
-        &H5P_DEFAULT
-    );
-    die "UniqueGlobalKey not found. Is this a valid FAST5 file?\n"
-        if ($gp < 0);
-    my $info = H5Gget_info($gp)
-        or die "failed to get info for meta group\n";
-    my $n = $info->{nlinks} // die "No attribute count specified\n";
-#
-    for my $i (0..$n-1) {
-#
-        my $gp_name = H5Lget_name_by_idx(
-            $gp,
-            '.',
-            &H5_INDEX_NAME,
-            &H5_ITER_INC,
-            $i,
-            &H5P_DEFAULT
-        );
-#
-        die "Failed to get group name\n"
-            if ($gp_name lt 0);
-#
-        my $sub_gp = H5Gopen(
-            $gp,
-            $gp_name,
-            &H5P_DEFAULT
-        );
-        die "subgroup $gp_name not found\n"
-            if ($sub_gp < 0);
-        $info = H5Oget_info($sub_gp)
-            or die "failed to get info for meta group\n";
-        my $n2 = $info->{num_attrs} // die "No attribute count specified\n";
-#
-        for my $j (0..$n2-1) {
-#
-            my $id = H5Aopen_by_idx(
-                $sub_gp,
-                '.',
-                &H5_INDEX_NAME,
-                &H5_ITER_INC,
-                $j,
-                &H5P_DEFAULT,
-                &H5P_DEFAULT
-            );
-            my $name = H5Aget_name($id);
-            die "Failed to get attr name\n"
-                if ($name lt 0);
-            $self->{meta}->{$gp_name}->{$name} = H5Aread($id)->[0]
-                if ($id >= 0);
-            H5Aclose($id);
-        }
-        H5Gclose($sub_gp);
-#
-    }
-    H5Gclose($gp);
-
-}
 
 sub _parse_raw {
 
@@ -135,31 +71,35 @@ sub _parse_raw {
         0,
         &H5P_DEFAULT
     );
-
     die "Failed to get read name\n"
         if ($read_name lt 0);
 
-    # the path to actual data depends on whether reads are packed
-    my $is_packed = 0;
     my $sub_gp = H5Gopen(
         $gp,
-        "$read_name/Signal_Pack",
+        $read_name,
         &H5P_DEFAULT
     );
-    if ($sub_gp >= 0) {
-        $is_packed = 1;
-    }
-    else {
+    die "Failed to open $read_name\n"
+        if ($sub_gp < 0);
+
+    # the path to actual data depends on whether reads are packed
+    my $is_packed = H5Lexists(
+        $sub_gp,
+        "Signal_Pack",
+        &H5P_DEFAULT
+    );
+    $self->{is_packed} = $is_packed;
+
+    if ($is_packed) {
         H5Gclose($sub_gp);
         $sub_gp = H5Gopen(
             $gp,
-            $read_name,
+            "$read_name/Signal_Pack",
             &H5P_DEFAULT
         );
+        die "subgroup $read_name/Signal_Pack not found\n"
+            if ($sub_gp < 0);
     }
-    die "subgroup $read_name not found\n"
-        if ($sub_gp < 0);
-    $self->{is_packed} = $is_packed;
 
     my $ds_id = H5Dopen(
         $sub_gp,
@@ -334,26 +274,25 @@ sub read_duration {
 }
 
 1;
+
 __END__
 
 =head1 NAME
 
-Data::HDF5 - Perl wrappers for HDF5 libary
+BioX::Seq::Fast5 - Read access to Fast5 files
 
 =head1 SYNOPSIS
 
-  use Data::HDF5;
+  use BioX::Seq::Fast5;
 
 =head1 ABSTRACT
 
-Bindings to the HDF5 library 
+Read access to Fast5 files
 
 =head1 DESCRIPTION
 
 
 =head1 SEE ALSO
 
-Documentation can found at
-http://hdfgroup.org/projects/bioinformatics/bio_software.html
 
 =cut

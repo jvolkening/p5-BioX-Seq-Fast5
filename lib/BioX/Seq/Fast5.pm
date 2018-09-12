@@ -285,6 +285,17 @@ sub read_duration {
 
 }
 
+# other accessors
+# TODO: make more slots available
+
+sub read_id        { $_[0]->_raw()->{read_id}                         }
+sub read_number    { $_[0]->_raw()->{read_number}                     }
+sub channel_number { $_[0]->_meta()->{channel_id}->{channel_number}   }
+sub sequencing_kit { $_[0]->_meta()->{context_tags}->{sequencing_kit} }
+sub flowcell       { $_[0]->_meta()->{context_tags}->{flowcell}       }
+sub run_id         { $_[0]->_meta()->{tracking_id}->{run_id}          }
+sub flowcell_id    { $_[0]->_meta()->{tracking_id}->{flow_cell_id}    }
+
 1;
 
 __END__

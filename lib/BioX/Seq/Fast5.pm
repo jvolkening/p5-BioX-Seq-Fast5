@@ -10,7 +10,7 @@ use Time::Piece;
 
 use Data::HDF5 qw/:all/;
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 
 sub new {
 
@@ -25,9 +25,6 @@ sub new {
     die "Failed to open HDF5 file for reading\n"
         if ($fid < 0);
     $self->{fid} = $fid;
-
-    #$self->_parse_meta;
-    #$self->_parse_raw;
 
     return $self;
 
@@ -45,6 +42,27 @@ sub DESTROY {
 
 }
 
+sub _meta {
+
+    my ($self) = @_;
+    
+    $self->_parse_meta()
+        if (! defined $self->{meta});
+
+    return $self->{meta}
+
+}
+
+sub _raw {
+
+    my ($self) = @_;
+    
+    $self->_parse_raw()
+        if (! defined $self->{raw});
+
+    return $self->{raw}
+
+}
 
 sub _parse_raw {
 
@@ -220,7 +238,7 @@ sub exp_start_time {
     return $self->{cache}->{exp_start_time}
         if (defined $self->{cache}->{exp_start_time});
 
-    my $t_str = $self->{meta}->{tracking_id}->{exp_start_time}
+    my $t_str = $self->_meta()->{tracking_id}->{exp_start_time}
         // return undef;
 
     if ($t_str =~ /\D/) { # string timestamp
@@ -241,10 +259,10 @@ sub read_start_time {
     return $self->{cache}->{read_start_time}
         if (defined $self->{cache}->{read_start_time});
 
-    my $t = $self->{raw}->{start_time}
+    my $t = $self->_raw()->{start_time}
         // return undef;
 
-    my $f = $self->{meta}->{context_tags}->{sample_frequency}
+    my $f = $self->_meta()->{context_tags}->{sample_frequency}
         // return undef;
 
     my $s = $self->exp_start_time() + $t/$f;
@@ -258,9 +276,9 @@ sub read_duration {
 
     my ($self) = @_;
 
-    my $d = $self->{raw}->{duration}
+    my $d = $self->_raw()->{duration}
         // return undef;
-    my $f = $self->{meta}->{context_tags}->{sample_frequency}
+    my $f = $self->_meta()->{context_tags}->{sample_frequency}
         // return undef;
    
     return $d/$f;

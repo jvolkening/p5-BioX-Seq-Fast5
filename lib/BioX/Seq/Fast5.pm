@@ -26,8 +26,8 @@ sub new {
         if ($fid < 0);
     $self->{fid} = $fid;
 
-    $self->_parse_meta;
-    $self->_parse_raw;
+    #$self->_parse_meta;
+    #$self->_parse_raw;
 
     return $self;
 
@@ -258,18 +258,12 @@ sub read_duration {
 
     my ($self) = @_;
 
-    return $self->{cache}->{read_duration}
-        if (defined $self->{cache}->{read_duration});
-
     my $d = $self->{raw}->{duration}
         // return undef;
     my $f = $self->{meta}->{context_tags}->{sample_frequency}
         // return undef;
    
-    $d = $d/$f;
-    $self->{cache}->{read_duration} = $d;
-
-    return $d;
+    return $d/$f;
 
 }
 

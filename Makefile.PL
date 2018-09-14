@@ -10,7 +10,9 @@ WriteMakefile(
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => 0,
     },
-    PREREQ_PM     => {},
+    PREREQ_PM     => {
+        'Data::HDF5' => 0, 
+    },
 
     META_MERGE => {
         'meta-spec' => { version => 2 },

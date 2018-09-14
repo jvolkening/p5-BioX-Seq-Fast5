@@ -4,8 +4,6 @@ use strict;
 use warnings;
 use 5.012;
 
-use Carp;
-use Data::Dumper;
 use Time::Piece;
 
 use Data::HDF5 qw/:all/;

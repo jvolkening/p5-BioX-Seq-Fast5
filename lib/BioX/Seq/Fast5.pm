@@ -77,14 +77,28 @@ sub _parse_called {
 
     my ($self) = @_;
 
+    # Check if 'Analyses' group exists
+    my $root = H5Gopen(
+        $self->{fid},
+        '/',
+        &H5P_DEFAULT
+    );
+    my $is_called = H5Lexists(
+        $sub_gp,
+        "$root/Analyses",
+        &H5P_DEFAULT
+    );
+    $self->{is_called} = $is_called;
+    H5Gclose($root);
+
+    # Not all FAST5 files will contain basecalling data
+    return if (! $self->{is_called});
+
     my $gp = H5Gopen(
         $self->{fid},
         '/Analyses',
         &H5P_DEFAULT
     );
-
-    # Not all FAST5 files will contain basecalling data
-    return if ($gp < 0);
 
     my $info = H5Gget_info($gp)
         or die "failed to get info for analyses group\n";

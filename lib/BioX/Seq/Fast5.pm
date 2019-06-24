@@ -62,6 +62,78 @@ sub _raw {
 
 }
 
+sub _called {
+
+    my ($self) = @_;
+    
+    $self->_parse_called()
+        if (! defined $self->{called});
+
+    return $self->{called}
+
+}
+
+sub _parse_called {
+
+    my ($self) = @_;
+
+    my $gp = H5Gopen(
+        $self->{fid},
+        '/Analyses',
+        &H5P_DEFAULT
+    );
+    die "Analyses not found. Is this a valid FAST5 file?\n"
+        if ($gp < 0);
+    my $info = H5Gget_info($gp)
+        or die "failed to get info for meta group\n";
+    my $n = $info->{nlinks} // die "No attribute count specified\n";
+    die "Multiple basecalls not yet supported\n"
+        if ($n != 1);
+
+    my $basecall = H5Lget_name_by_idx(
+        $gp,
+        '.',
+        &H5_INDEX_NAME,
+        &H5_ITER_INC,
+        0,
+        &H5P_DEFAULT
+    );
+    die "Failed to get read name\n"
+        if ($basecall lt 0);
+
+    my $sub_gp = H5Gopen(
+        $gp,
+        $basecall,
+        &H5P_DEFAULT
+    );
+    die "Failed to open $basecall\n"
+        if ($sub_gp < 0);
+
+    H5Gclose($sub_gp);
+    $sub_gp = H5Gopen(
+        $gp,
+        "$basecall/BaseCalled_template",
+        &H5P_DEFAULT
+    );
+    die "subgroup $basecall/BaseCalled_template not found\n"
+        if ($sub_gp < 0);
+
+    my $ds_id = H5Dopen(
+        $sub_gp,
+        'Fastq',
+        &H5P_DEFAULT,
+    );
+    my $fq;
+    if ($ds_id >= 0) {
+        $self->{called}->{fastq} = H5Dread($ds_id);
+    }
+    H5Dclose($ds_id);
+
+    H5Gclose($sub_gp);
+    H5Gclose($gp);
+
+}
+
 sub _parse_raw {
 
     my ($self) = @_;
@@ -286,6 +358,7 @@ sub read_duration {
 # other accessors
 # TODO: make more slots available
 
+sub fastq          { $_[0]->_called()->{fastq}                        }
 sub read_id        { $_[0]->_raw()->{read_id}                         }
 sub read_number    { $_[0]->_raw()->{read_number}                     }
 sub channel_number { $_[0]->_meta()->{channel_id}->{channel_number}   }

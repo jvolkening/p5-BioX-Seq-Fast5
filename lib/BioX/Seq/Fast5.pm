@@ -82,10 +82,12 @@ sub _parse_called {
         '/Analyses',
         &H5P_DEFAULT
     );
-    die "Analyses not found. Is this a valid FAST5 file?\n"
-        if ($gp < 0);
+
+    # Not all FAST5 files will contain basecalling data
+    return if ($gp < 0);
+
     my $info = H5Gget_info($gp)
-        or die "failed to get info for meta group\n";
+        or die "failed to get info for analyses group\n";
     my $n = $info->{nlinks} // die "No attribute count specified\n";
     die "Multiple basecalls not yet supported\n"
         if ($n != 1);

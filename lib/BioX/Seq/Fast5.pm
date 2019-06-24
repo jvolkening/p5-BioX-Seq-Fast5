@@ -91,7 +91,6 @@ sub _parse_called {
         &H5P_DEFAULT
     );
     $self->{is_called} = $is_called;
-    H5Gclose($root);
 
     # Not all FAST5 files will contain basecalling data
     if (! $self->{is_called}) {
@@ -100,8 +99,8 @@ sub _parse_called {
     }
 
     my $gp = H5Gopen(
-        $self->{fid},
-        '/Analyses',
+        $root,
+        'Analyses',
         &H5P_DEFAULT
     );
 
@@ -141,6 +140,7 @@ sub _parse_called {
 
     H5Gclose($sub_gp);
     H5Gclose($gp);
+    H5Gclose($root);
 
 }
 

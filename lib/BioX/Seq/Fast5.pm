@@ -84,8 +84,8 @@ sub _parse_called {
         &H5P_DEFAULT
     );
     my $is_called = H5Lexists(
-        $sub_gp,
-        "$root/Analyses",
+        $root,
+        "Analyses",
         &H5P_DEFAULT
     );
     $self->{is_called} = $is_called;

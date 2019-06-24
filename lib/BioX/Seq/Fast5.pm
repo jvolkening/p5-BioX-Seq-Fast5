@@ -77,6 +77,8 @@ sub _parse_called {
 
     my ($self) = @_;
 
+    $self->{called} = {};
+
     # Check if 'Analyses' group exists
     my $root = H5Gopen(
         $self->{fid},
@@ -92,7 +94,10 @@ sub _parse_called {
     H5Gclose($root);
 
     # Not all FAST5 files will contain basecalling data
-    return if (! $self->{is_called});
+    if (! $self->{is_called}) {
+        warn "No basecalling data in file\n";
+        return;
+    }
 
     my $gp = H5Gopen(
         $self->{fid},
@@ -104,29 +109,18 @@ sub _parse_called {
         or die "failed to get info for analyses group\n";
     my $n = $info->{nlinks} // die "No attribute count specified\n";
     die "Multiple basecalls not yet supported\n"
-        if ($n != 1);
+        if ($n > 2);
 
-    my $basecall = H5Lget_name_by_idx(
-        $gp,
-        '.',
-        &H5_INDEX_NAME,
-        &H5_ITER_INC,
-        0,
-        &H5P_DEFAULT
-    );
-    die "Failed to get read name\n"
-        if ($basecall lt 0);
-
-    my $sub_gp = H5Gopen(
+    my $basecall = 'Basecall_1D_000';
+    my $found_1D = H5Lexists(
         $gp,
         $basecall,
         &H5P_DEFAULT
     );
-    die "Failed to open $basecall\n"
-        if ($sub_gp < 0);
+    die "Only 1D data supported and none found\n"
+        if (! $found_1D);
 
-    H5Gclose($sub_gp);
-    $sub_gp = H5Gopen(
+    my $sub_gp = H5Gopen(
         $gp,
         "$basecall/BaseCalled_template",
         &H5P_DEFAULT
@@ -141,7 +135,7 @@ sub _parse_called {
     );
     my $fq;
     if ($ds_id >= 0) {
-        $self->{called}->{fastq} = H5Dread($ds_id);
+        $self->{called}->{fastq} = H5Dread($ds_id)->[0];
     }
     H5Dclose($ds_id);
 

@@ -72,13 +72,13 @@ sub extract {
         if (($n_parsed % 100) == 0) {
             my $cnts = join ", ",
                 (map {"$_:$counts{$_}"} sort {$a <=> $b} keys %counts);
-            if (-t STDOUT) {
-                print "Parsed ";
-                print colored($n_parsed, 'bold green');
-                print " ($cnts)\r";
+            if (-t STDERR) {
+                print STDERR "Parsed ";
+                print STDERR colored($n_parsed, 'bold green');
+                print STDERR " ($cnts)\r";
             }
             else {
-                print "Parsed $n_parsed ($cnts)\n";
+                print STDERR "Parsed $n_parsed ($cnts)\n";
             }
         }
 

@@ -23,6 +23,8 @@ require_ok( "BioX::Seq::Fast5" );
 
 ok( my $file = BioX::Seq::Fast5->new(FN), "open FAST5 file" );
 
+ok( $file->file_version eq '0.6', "check file version" );
+
 # test time calculations
 ok( $file->exp_start_time eq '1503961912',
     "exp_start_time" );

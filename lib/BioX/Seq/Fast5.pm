@@ -24,6 +24,10 @@ sub new {
         if ($fid < 0);
     $self->{fid} = $fid;
 
+    $self->_parse_root();
+    die "Failed to parse file version\n"
+        if (! defined $self->file_version);
+
     return $self;
 
 }
@@ -70,6 +74,46 @@ sub _called {
         if (! defined $self->{called});
 
     return $self->{called}
+
+}
+
+sub _parse_root {
+
+    my ($self) = @_;
+
+    $self->{_root_attr} = {};
+
+    # Check if 'Analyses' group exists
+    my $root = H5Gopen(
+        $self->{fid},
+        '/',
+        &H5P_DEFAULT
+    );
+
+    my $info = H5Oget_info($root)
+        or die "failed to get info for root group\n";
+    my $n_attrs = $info->{num_attrs} // die "No attribute count specified\n";
+
+    for my $j (0..$n_attrs-1) {
+
+        my $id = H5Aopen_by_idx(
+            $root,
+            '.',
+            &H5_INDEX_NAME,
+            &H5_ITER_INC,
+            $j,
+            &H5P_DEFAULT,
+            &H5P_DEFAULT
+        );
+        my $name = H5Aget_name($id);
+        die "Failed to get attr name\n"
+            if ($name lt 0);
+        $self->{_root_attr}->{$name} = H5Aread($id)->[0]
+            if ($id >= 0);
+        H5Aclose($id);
+    }
+
+    H5Gclose($root);
 
 }
 
@@ -368,12 +412,14 @@ sub read_duration {
 # other accessors
 # TODO: make more slots available
 
+sub file_version   { $_[0]->{_root_attr}->{file_version}              }
 sub fastq          { $_[0]->_called()->{fastq}                        }
 sub read_id        { $_[0]->_raw()->{read_id}                         }
 sub read_number    { $_[0]->_raw()->{read_number}                     }
 sub channel_number { $_[0]->_meta()->{channel_id}->{channel_number}   }
 sub sequencing_kit { $_[0]->_meta()->{context_tags}->{sequencing_kit} }
-sub flowcell       { $_[0]->_meta()->{context_tags}->{flowcell}       }
+sub flowcell       { $_[0]->_meta()->{context_tags}->{flowcell}
+    // $_[0]->_meta()->{content_tags}->{flowcell_type}                }
 sub run_id         { $_[0]->_meta()->{tracking_id}->{run_id}          }
 sub flowcell_id    { $_[0]->_meta()->{tracking_id}->{flow_cell_id}    }
 

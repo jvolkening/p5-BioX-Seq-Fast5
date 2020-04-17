@@ -1,7 +1,7 @@
-bin/replay_run.pl
-bin/time_series.pl
+bin/f5_to_fq
 Changes
 lib/BioX/Seq/Fast5.pm
+lib/BioX/Seq/Fast5/Seq.pm
 Makefile.PL
 MANIFEST			This list of files
 t/fast5.t

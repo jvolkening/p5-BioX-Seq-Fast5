@@ -8,6 +8,8 @@ use Time::Piece;
 
 use Data::HDF5 qw/:all/;
 
+use BioX::Seq::Fast5::Seq;
+
 our $VERSION = '0.002';
 
 use constant MULTI_VERSION => 1.0;
@@ -34,6 +36,23 @@ sub new {
 
 }
 
+sub next_seq {
+
+    my ($self) = @_;
+
+    return undef
+        if ($self->{_seq_iter} >= $self->{_n_seqs});
+
+    my $iter = $self->{_seq_iter}++;
+
+    return BioX::Seq::Fast5::Seq->new(
+        fid   => $self->{fid},
+        iter  => $iter,
+        multi => $self->file_version >= MULTI_VERSION ? 1 : 0,
+    );
+
+}
+
 sub DESTROY {
 
     my ($self) = @_;
@@ -43,17 +62,6 @@ sub DESTROY {
         if ($ret < 0);
 
     return 1;
-
-}
-
-sub _meta {
-
-    my ($self) = @_;
-    
-    $self->_parse_meta()
-        if (! defined $self->{meta});
-
-    return $self->{meta}
 
 }
 
@@ -123,30 +131,12 @@ sub _parse_root {
         my $n = $info->{nlinks} // die "No group count specified\n";
 
         $self->{_n_seqs} = $n;
+        $self->{_seq_iter} = 0;
 
-        for my $i (0..$n-1) {
-
-            my $gp_name = H5Lget_name_by_idx(
-                $root,
-                '.',
-                &H5_INDEX_NAME,
-                &H5_ITER_INC,
-                $i,
-                &H5P_DEFAULT
-            );
-
-            die "Failed to get group name\n"
-                if ($gp_name lt 0);
-
-            #my $sub_gp = H5Gopen(
-                #$gp,
-                #$gp_name,
-                #&H5P_DEFAULT
-            #);
-            #die "subgroup $gp_name not found\n"
-                #if ($sub_gp < 0);
-            say $gp_name;
-        }
+    }
+    else {
+        $self->{_n_seqs}   = 1;
+        $self->{_seq_iter} = 0;
     }
 
     H5Gclose($root);
@@ -326,125 +316,6 @@ sub _parse_raw {
 
 }
 
-sub _parse_meta {
-
-    my ($self) = @_;
-
-    my $gp = H5Gopen(
-        $self->{fid},
-        "/UniqueGlobalKey",
-        &H5P_DEFAULT
-    );
-    die "UniqueGlobalKey not found. Is this a valid FAST5 file?\n"
-        if ($gp < 0);
-    my $info = H5Gget_info($gp)
-        or die "failed to get info for meta group\n";
-    my $n = $info->{nlinks} // die "No attribute count specified\n";
-
-    for my $i (0..$n-1) {
-
-        my $gp_name = H5Lget_name_by_idx(
-            $gp,
-            '.',
-            &H5_INDEX_NAME,
-            &H5_ITER_INC,
-            $i,
-            &H5P_DEFAULT
-        );
-
-        die "Failed to get group name\n"
-            if ($gp_name lt 0);
-
-        my $sub_gp = H5Gopen(
-            $gp,
-            $gp_name,
-            &H5P_DEFAULT
-        );
-        die "subgroup $gp_name not found\n"
-            if ($sub_gp < 0);
-        $info = H5Oget_info($sub_gp)
-            or die "failed to get info for meta group\n";
-        my $n2 = $info->{num_attrs} // die "No attribute count specified\n";
-
-        for my $j (0..$n2-1) {
-
-            my $id = H5Aopen_by_idx(
-                $sub_gp,
-                '.',
-                &H5_INDEX_NAME,
-                &H5_ITER_INC,
-                $j,
-                &H5P_DEFAULT,
-                &H5P_DEFAULT
-            );
-            my $name = H5Aget_name($id);
-            die "Failed to get attr name\n"
-                if ($name lt 0);
-            $self->{meta}->{$gp_name}->{$name} = H5Aread($id)->[0]
-                if ($id >= 0);
-            H5Aclose($id);
-        }
-        H5Gclose($sub_gp);
-
-    }
-    H5Gclose($gp);
-
-}
-
-sub exp_start_time {
-
-    my ($self) = @_;
-
-    return $self->{cache}->{exp_start_time}
-        if (defined $self->{cache}->{exp_start_time});
-
-    my $t_str = $self->_meta()->{tracking_id}->{exp_start_time}
-        // return undef;
-
-    if ($t_str =~ /\D/) { # string timestamp
-        my $t = Time::Piece->strptime($t_str, "%Y-%m-%dT%TZ")
-            or die "Error parsing timestamp: $@\n";
-        $t_str = $t->epoch;
-    }
-    
-    $self->{cache}->{exp_start_time} = $t_str;
-    return $t_str;
-        
-} 
-
-sub read_start_time {
-
-    my ($self) = @_;
-
-    return $self->{cache}->{read_start_time}
-        if (defined $self->{cache}->{read_start_time});
-
-    my $t = $self->_raw()->{start_time}
-        // return undef;
-
-    my $f = $self->_meta()->{context_tags}->{sample_frequency}
-        // return undef;
-
-    my $s = $self->exp_start_time() + $t/$f;
-    
-    $self->{cache}->{read_start_time} = $s;
-    return $s;
-        
-} 
-
-sub read_duration {
-
-    my ($self) = @_;
-
-    my $d = $self->_raw()->{duration}
-        // return undef;
-    my $f = $self->_meta()->{context_tags}->{sample_frequency}
-        // return undef;
-   
-    return $d/$f;
-
-}
-
 # other accessors
 # TODO: make more slots available
 
@@ -453,12 +324,6 @@ sub n_seqs         { $_[0]->{_n_seqs}                                 }
 sub fastq          { $_[0]->_called()->{fastq}                        }
 sub read_id        { $_[0]->_raw()->{read_id}                         }
 sub read_number    { $_[0]->_raw()->{read_number}                     }
-sub channel_number { $_[0]->_meta()->{channel_id}->{channel_number}   }
-sub sequencing_kit { $_[0]->_meta()->{context_tags}->{sequencing_kit} }
-sub flowcell       { $_[0]->_meta()->{context_tags}->{flowcell}
-    // $_[0]->_meta()->{content_tags}->{flowcell_type}                }
-sub run_id         { $_[0]->_meta()->{tracking_id}->{run_id}          }
-sub flowcell_id    { $_[0]->_meta()->{tracking_id}->{flow_cell_id}    }
 
 1;
 

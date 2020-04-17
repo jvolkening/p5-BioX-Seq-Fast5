@@ -10,6 +10,8 @@ use Data::HDF5 qw/:all/;
 
 our $VERSION = '0.002';
 
+use constant MULTI_VERSION => 1.0;
+
 sub new {
 
     my ($class, $fn) = @_;
@@ -83,13 +85,13 @@ sub _parse_root {
 
     $self->{_root_attr} = {};
 
-    # Check if 'Analyses' group exists
     my $root = H5Gopen(
         $self->{fid},
         '/',
         &H5P_DEFAULT
     );
 
+    # extract root attributes (currently only file version)
     my $info = H5Oget_info($root)
         or die "failed to get info for root group\n";
     my $n_attrs = $info->{num_attrs} // die "No attribute count specified\n";
@@ -111,6 +113,40 @@ sub _parse_root {
         $self->{_root_attr}->{$name} = H5Aread($id)->[0]
             if ($id >= 0);
         H5Aclose($id);
+    }
+
+    # for newer file formats, find number of embedded reads
+    if ($self->file_version >= MULTI_VERSION) {
+
+        my $info = H5Gget_info($root)
+            or die "failed to get info for meta group\n";
+        my $n = $info->{nlinks} // die "No group count specified\n";
+
+        $self->{_n_seqs} = $n;
+
+        for my $i (0..$n-1) {
+
+            my $gp_name = H5Lget_name_by_idx(
+                $root,
+                '.',
+                &H5_INDEX_NAME,
+                &H5_ITER_INC,
+                $i,
+                &H5P_DEFAULT
+            );
+
+            die "Failed to get group name\n"
+                if ($gp_name lt 0);
+
+            #my $sub_gp = H5Gopen(
+                #$gp,
+                #$gp_name,
+                #&H5P_DEFAULT
+            #);
+            #die "subgroup $gp_name not found\n"
+                #if ($sub_gp < 0);
+            say $gp_name;
+        }
     }
 
     H5Gclose($root);
@@ -413,6 +449,7 @@ sub read_duration {
 # TODO: make more slots available
 
 sub file_version   { $_[0]->{_root_attr}->{file_version}              }
+sub n_seqs         { $_[0]->{_n_seqs}                                 }
 sub fastq          { $_[0]->_called()->{fastq}                        }
 sub read_id        { $_[0]->_raw()->{read_id}                         }
 sub read_number    { $_[0]->_raw()->{read_number}                     }

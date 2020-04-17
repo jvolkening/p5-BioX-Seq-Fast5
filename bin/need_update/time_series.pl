@@ -21,7 +21,7 @@ my @durations; # in minutes
 GetOptions(
     'in_dir=s'    => \$in_dir,
     'in_fq=s'     => \$in_fq,
-    'durations=i' => \@durations,
+    'durations=s' => \@durations,
     'out_dir=s'   => \$out_dir,
 );
 

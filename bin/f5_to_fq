@@ -1,0 +1,93 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use 5.012;
+
+use autodie;
+use BioX::Seq::Fast5;
+use File::Basename qw/basename/;
+use File::Find;
+use Getopt::Long;
+use Term::ANSIColor;
+
+my $in;
+my $fn_out;
+
+GetOptions(
+    'in=s'  => \$in,
+    'out=s' => \$fn_out,
+);
+
+my $n_parsed = 0;
+my %counts;
+my %want;
+
+my $out = \*STDOUT;
+if (defined $fn_out) {
+    open $out, '>', $fn_out;
+}
+
+if (-f $in) {
+    extract($in);
+}
+elsif (-d $in) {
+    # recurse over FAST5 files
+    $| = 1;
+    find( {
+        wanted => \&wanted,
+        no_chdir => 1,
+    }, $in );
+    $| = 0;
+}
+else {
+    die "Invalid or unspecified input file or directory: $in\n";
+}
+
+if (defined $fn_out) {
+    close $out;
+}
+
+sub wanted {
+
+    # skip non-FAST5 files
+    return if (! -f $_);
+    return if ($_ !~ /\.fast5$/);
+
+    extract($_);
+
+}
+
+sub extract {
+
+    my ($fn) = @_;
+
+    my $p = BioX::Seq::Fast5->new($fn)
+        or die "Error reading FAST5 file $fn: $@\n";
+
+    while (my $read = $p->next_seq) {
+
+        # print status messages
+        ++$n_parsed;
+        if (($n_parsed % 100) == 0) {
+            my $cnts = join ", ",
+                (map {"$_:$counts{$_}"} sort {$a <=> $b} keys %counts);
+            if (-t STDOUT) {
+                print "Parsed ";
+                print colored($n_parsed, 'bold green');
+                print " ($cnts)\r";
+            }
+            else {
+                print "Parsed $n_parsed ($cnts)\n";
+            }
+        }
+
+        my $fq = $read->fastq
+            // die "No FASTQ data found in read within $fn\n";
+
+        print {$out} $fq;
+
+    }
+
+}
+

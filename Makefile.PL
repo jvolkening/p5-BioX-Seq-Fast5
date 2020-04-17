@@ -24,6 +24,9 @@ WriteMakefile(
             },
         },
     },
+    EXE_FILES => [qw|
+        bin/f5_to_fq
+    |],
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => ['BioX-Seq-Fast5-*'] },
 );

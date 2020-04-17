@@ -100,7 +100,7 @@ sub _parse_called {
     # Check if 'Analyses' group exists
     my $root = H5Gopen(
         $self->{fid},
-        '/',
+        $self->{_root},
         &H5P_DEFAULT
     );
     my $is_called = H5Lexists(
@@ -138,6 +138,40 @@ sub _parse_called {
         if (! $found_1D);
 
     my $sub_gp = H5Gopen(
+        $gp,
+        $basecall,
+        &H5P_DEFAULT
+    );
+    die "subgroup $basecall not found\n"
+        if ($sub_gp < 0);
+
+    # parse basecalling metadata
+    $info = H5Oget_info($sub_gp)
+        or die "failed to get info for meta group\n";
+    my $n_attrs = $info->{num_attrs} // die "No attribute count specified\n";
+
+    for my $j (0..$n_attrs-1) {
+
+        my $id = H5Aopen_by_idx(
+            $sub_gp,
+            '.',
+            &H5_INDEX_NAME,
+            &H5_ITER_INC,
+            $j,
+            &H5P_DEFAULT,
+            &H5P_DEFAULT
+        );
+        my $name = H5Aget_name($id);
+        die "Failed to get attr name\n"
+            if ($name lt 0);
+        $self->{called}->{meta}->{$name} = H5Aread($id)->[0]
+            if ($id >= 0);
+        H5Aclose($id);
+    }
+    H5Gclose($sub_gp);
+
+    # read FASTQ basecalls
+    $sub_gp = H5Gopen(
         $gp,
         "$basecall/BaseCalled_template",
         &H5P_DEFAULT
@@ -405,16 +439,19 @@ sub read_duration {
 # other accessors
 # TODO: make more slots available
 
-sub fastq          { $_[0]->_called()->{fastq}                        }
-sub read_id        { $_[0]->_raw()->{read_id}                         }
-sub read_number    { $_[0]->_raw()->{read_number}                     }
-sub channel_number { $_[0]->_meta()->{channel_id}->{channel_number}   }
-sub sequencing_kit { $_[0]->_meta()->{context_tags}->{sequencing_kit} }
-sub run_id         { $_[0]->_meta()->{tracking_id}->{run_id}          }
-sub flowcell_id    { $_[0]->_meta()->{tracking_id}->{flow_cell_id}    }
-sub signal         { $_[0]->_raw()->{signal}                          }
+sub fastq              { $_[0]->_called()->{fastq}                        }
+sub read_id            { $_[0]->_raw()->{read_id}                         }
+sub read_number        { $_[0]->_raw()->{read_number}                     }
+sub channel_number     { $_[0]->_meta()->{channel_id}->{channel_number}   }
+sub sequencing_kit     { $_[0]->_meta()->{context_tags}->{sequencing_kit} }
+sub run_id             { $_[0]->_meta()->{tracking_id}->{run_id}          }
+sub flowcell_id        { $_[0]->_meta()->{tracking_id}->{flow_cell_id}    }
+sub signal             { $_[0]->_raw()->{signal}                          }
+sub basecall_software  { $_[0]->_called()->{meta}->{name}               }
+sub basecall_version   { $_[0]->_called()->{meta}->{version}            }
+sub basecall_timestamp { $_[0]->_called()->{meta}->{time_stamp}       }
 # naming changed between file versions
-sub flowcell       { $_[0]->_meta()->{context_tags}->{flowcell}
+sub flowcell           { $_[0]->_meta()->{context_tags}->{flowcell}
     // $_[0]->_meta()->{context_tags}->{flowcell_type}                }
 
 1;

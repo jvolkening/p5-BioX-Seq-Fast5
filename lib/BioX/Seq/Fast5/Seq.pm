@@ -447,12 +447,15 @@ sub sequencing_kit     { $_[0]->_meta()->{context_tags}->{sequencing_kit} }
 sub run_id             { $_[0]->_meta()->{tracking_id}->{run_id}          }
 sub flowcell_id        { $_[0]->_meta()->{tracking_id}->{flow_cell_id}    }
 sub signal             { $_[0]->_raw()->{signal}                          }
-sub basecall_software  { $_[0]->_called()->{meta}->{name}               }
-sub basecall_version   { $_[0]->_called()->{meta}->{version}            }
-sub basecall_timestamp { $_[0]->_called()->{meta}->{time_stamp}       }
+sub basecall_software  { $_[0]->_called()->{meta}->{name}                 }
+sub basecall_version   { $_[0]->_called()->{meta}->{version}              }
+sub basecall_timestamp { $_[0]->_called()->{meta}->{time_stamp}           }
 # naming changed between file versions
 sub flowcell           { $_[0]->_meta()->{context_tags}->{flowcell}
-    // $_[0]->_meta()->{context_tags}->{flowcell_type}                }
+    // $_[0]->_meta()->{context_tags}->{flowcell_type}
+    // $_[0]->_meta()->{tracking_id}->{flow_cell_product_code}            }
+sub device_type        { $_[0]->_meta()->{tracking_id}->{device_type}     }
+sub device_id          { $_[0]->_meta()->{tracking_id}->{device_id}       }
 
 1;
 

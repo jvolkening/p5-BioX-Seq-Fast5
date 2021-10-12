@@ -10,7 +10,7 @@ use Data::HDF5 qw/:all/;
 
 use BioX::Seq::Fast5::Seq;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 use constant MULTI_VERSION => 1.0;
 

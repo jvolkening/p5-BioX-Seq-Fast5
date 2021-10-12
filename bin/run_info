@@ -71,6 +71,8 @@ sub extract {
             (join "\t", 'flowcell_id', $read->flowcell_id),
             (join "\t", 'flowcell_type', $read->flowcell),
             (join "\t", 'sequencing_kit', $read->sequencing_kit),
+            (join "\t", 'device_type', $read->device_type),
+            (join "\t", 'device_ID', $read->device_id),
         ;
 
         exit;

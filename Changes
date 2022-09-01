@@ -1,5 +1,9 @@
 Revision history for Perl library Data::HDF5
 
+0.004 2022-08-31
+    - Add random-access fetch_seq() method
+    - Add tools to create and run "replay scripts" for run simulation
+
 0.003 2021-10-12
     - Add new slot location for flowcell type in newer files
 

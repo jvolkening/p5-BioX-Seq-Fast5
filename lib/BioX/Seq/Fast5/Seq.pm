@@ -440,6 +440,7 @@ sub read_duration {
 # TODO: make more slots available
 
 sub fastq              { $_[0]->_called()->{fastq}                        }
+sub iter               { $_[0]->{iter}                                    }
 sub read_id            { $_[0]->_raw()->{read_id}                         }
 sub read_number        { $_[0]->_raw()->{read_number}                     }
 sub channel_number     { $_[0]->_meta()->{channel_id}->{channel_number}   }

@@ -53,6 +53,22 @@ sub next_seq {
 
 }
 
+sub fetch_seq {
+
+    my ($self, $iter) = @_;
+
+    return undef
+        if ($iter >= $self->{_n_seqs});
+
+    return BioX::Seq::Fast5::Seq->new(
+        fid   => $self->{fid},
+        iter  => $iter,
+        multi => $self->file_version >= MULTI_VERSION ? 1 : 0,
+    );
+
+}
+
+
 sub DESTROY {
 
     my ($self) = @_;

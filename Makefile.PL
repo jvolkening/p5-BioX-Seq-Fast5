@@ -25,7 +25,10 @@ WriteMakefile(
         },
     },
     EXE_FILES => [qw|
+        bin/create_replay_script.pl
         bin/f5_to_fq
+        bin/run_info
+        bin/run_replay_script.pl
     |],
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => ['BioX-Seq-Fast5-*'] },
